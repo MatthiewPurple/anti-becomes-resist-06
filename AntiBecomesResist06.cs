@@ -22,7 +22,7 @@ public class AntiBecomesResist06 : MelonMod
         public static void Postfix(ref int formindex, ref int attr, ref uint __result)
         {
             // If the target with Anti-X is getting hit multiple times, keep resisting
-            if (unit != null)
+            if (unit != null && unit.id == nbMainProcess.nbGetUnitWorkFromFormindex(formindex).id)
             {
                 __result = 50; // Resist
             }
