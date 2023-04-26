@@ -11,9 +11,7 @@ using Il2CppInterop.Runtime.InteropTypes.Arrays;
 namespace anti_becomes_resist_06;
 public class AntiBecomesResist06 : MelonMod
 {
-    private static int antiSkillID = 0; // Anti-X skill ID
-    private static datUnitWork_t unit = null; // Target of an attack
-    private static int skillSlot = 0; // Slot with the Anti-X skill
+    private static List<Tuple<datUnitWork_t, int, int>> demonsWithResist = new List<Tuple<datUnitWork_t, int, int>>();
 
     // After checking for the element of an attack
     [HarmonyPatch(typeof(nbCalc), nameof(nbCalc.nbGetAisyo))]
@@ -21,83 +19,80 @@ public class AntiBecomesResist06 : MelonMod
     {
         public static void Postfix(ref int formindex, ref int attr, ref uint __result)
         {
-            // If the target with Anti-X is getting hit multiple times, keep resisting
-            if (unit != null && unit.id == nbMainProcess.nbGetUnitWorkFromFormindex(formindex).id)
+            datUnitWork_t targetUnit = nbMainProcess.nbGetUnitWorkFromFormindex(formindex);
+
+            // If the target with "Resist X" has already been added to the list
+            foreach (Tuple<datUnitWork_t, int, int> demonInfo in demonsWithResist)
             {
-                __result = 50; // Resist
+                if (demonInfo.Item1.id == targetUnit.id)
+                {
+                    __result = 50; // Resist
+                    return;
+                }
             }
-            else
+
+            //If not neutral, pseudo-weak nor weak, act as normal
+            if ((__result < 100 || __result > 999) && __result < 1000000000) return;
+
+            int antiSkillID;
+
+            switch (attr)
             {
-                //If not neutral, pseudo-weak nor weak, act as normal
-                if ((__result < 100 || __result > 999) && __result < 1000000000) return;
+                //Anti-Phys
+                case 0:
+                    antiSkillID = 313;
+                    break;
+                //Anti-Fire
+                case 1:
+                    antiSkillID = 314;
+                    break;
+                //Anti-Ice
+                case 2:
+                    antiSkillID = 315;
+                    break;
+                //Anti-Elec
+                case 3:
+                    antiSkillID = 316;
+                    break;
+                //Anti-Force
+                case 4:
+                    antiSkillID = 317;
+                    break;
+                //Anti-Light
+                case 6:
+                    antiSkillID = 318;
+                    break;
+                //Anti-Dark
+                case 7:
+                    antiSkillID = 319;
+                    break;
+                //Anti-Curse
+                case 8:
+                    antiSkillID = 320;
+                    break;
+                //Anti-Nerve
+                case 9:
+                    antiSkillID = 321;
+                    break;
+                //Anti-Mind
+                case 10:
+                    antiSkillID = 322;
+                    break;
+                default:
+                    return;
+            }
 
-                unit = nbMainProcess.nbGetUnitWorkFromFormindex(formindex); // Get target
-                switch (attr)
+            //If the target has the corresponding Anti-X skill
+            for (int i = 0; i < targetUnit.skill.Count; i++)
+            {
+                if (targetUnit.skill[i] == antiSkillID)
                 {
-                    //Anti-Phys
-                    case 0:
-                        antiSkillID = 313;
-                        break;
-                    //Anti-Fire
-                    case 1:
-                        antiSkillID = 314;
-                        break;
-                    //Anti-Ice
-                    case 2:
-                        antiSkillID = 315;
-                        break;
-                    //Anti-Elec
-                    case 3:
-                        antiSkillID = 316;
-                        break;
-                    //Anti-Force
-                    case 4:
-                        antiSkillID = 317;
-                        break;
-                    //Anti-Light
-                    case 6:
-                        antiSkillID = 318;
-                        break;
-                    //Anti-Dark
-                    case 7:
-                        antiSkillID = 319;
-                        break;
-                    //Anti-Curse
-                    case 8:
-                        antiSkillID = 320;
-                        break;
-                    //Anti-Nerve
-                    case 9:
-                        antiSkillID = 321;
-                        break;
-                    //Anti-Mind
-                    case 10:
-                        antiSkillID = 322;
-                        break;
-                    default:
-                        unit = null;
-                        antiSkillID = 0;
-                        skillSlot = 0;
-                        return;
+                    __result = 50; // Resist
+
+                    demonsWithResist.Add(new Tuple<datUnitWork_t, int, int>(targetUnit, i, antiSkillID)); // Adds the demon to the list
+                    targetUnit.skill[i] = 0; // Removes the skill temporarily
+                    return;
                 }
-
-                //If the target has the corresponding Anti-X skill
-                for (int i = 0; i < unit.skill.Count; i++)
-                {
-                    if (unit.skill[i] == antiSkillID)
-                    {
-                        __result = 50; // Resist
-
-                        skillSlot = i;
-                        unit.skill[skillSlot] = 0;
-                        return;
-                    }
-                }
-
-                // If they don't, reset
-                unit = null;
-                antiSkillID = 0;
-                skillSlot = 0;
             }
         }
     }
@@ -160,16 +155,14 @@ public class AntiBecomesResist06 : MelonMod
     {
         public static void Postfix()
         {
-            //If the skill has been temporarily removed, put it back where it was
-            if (unit != null)
+            // For each demon with "Resist X"
+            foreach (Tuple<datUnitWork_t, int, int> demonInfo in demonsWithResist)
             {
-                unit.skill[skillSlot] = antiSkillID;
-
-                // Reset everything for next time
-                unit = null;
-                antiSkillID = 0;
-                skillSlot = 0;
+                demonInfo.Item1.skill[demonInfo.Item2] = demonInfo.Item3; // Puts the removed skill back
             }
+
+            // Clears the list
+            demonsWithResist.Clear();
         }
     }
 }
